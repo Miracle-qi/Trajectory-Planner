@@ -5,6 +5,7 @@ from Path_generator.common import Traj_Point
 
 
 def path_planner_3Dbezier(start_pos, start_dir, goal_pos, goal_dir, interval):
+
     control_point_shift = 1.0 / 3
     length = math.sqrt((goal_pos[0] - start_pos[0]) ** 2 + (goal_pos[1] - start_pos[1]) ** 2)
     norm_goal_dir = math.sqrt(goal_dir[0]**2 + goal_dir[1]**2)
@@ -55,6 +56,7 @@ def path_planner_3Dbezier(start_pos, start_dir, goal_pos, goal_dir, interval):
         traj_points.append(point)
         t = t + dt
     return traj_points
+
 
 if __name__ == '__main__':
     traj_test = path_planner_3Dbezier([0, 0], [1, 0], [60, 20], [1, 0],  0.2)
