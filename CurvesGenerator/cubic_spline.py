@@ -182,19 +182,6 @@ class Spline2D:
         return yaw
 
 
-def calc_spline_course(x, y, ds=0.1):
-    sp = Spline2D(x, y)
-    s = np.arange(0, sp.s[-1], ds)
-
-    rx, ry, ryaw, rk = [], [], [], []
-    for i_s in s:
-        ix, iy = sp.calc_position(i_s)
-        rx.append(ix)
-        ry.append(iy)
-        ryaw.append(sp.calc_yaw(i_s))
-        rk.append(sp.calc_curvature(i_s))
-
-    return rx, ry, ryaw, rk, s
 
 
 def test_spline2d():

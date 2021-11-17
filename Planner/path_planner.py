@@ -1,4 +1,4 @@
-from CurvesGenerator import cubic_spline
+from CurvesGenerator import cubic_spline, Bezier_curve
 import numpy as np
 
 

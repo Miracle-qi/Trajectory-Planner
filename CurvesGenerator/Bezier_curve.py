@@ -1,8 +1,24 @@
 import math
+import numpy as np
 import matplotlib.pyplot as plt
-from Path_generator.common import Traj_Point
+from common import Traj_Point
 
+class bezierCurve:
 
+    def __init__(self, start_pos, start_dir, goal_pos, goal_dir, interval):
+
+    def __calc_s(self, x, y):
+        dx = np.diff(x)
+        dy = np.diff(y)
+        self.ds = [math.sqrt(idx ** 2 + idy ** 2)
+                   for (idx, idy) in zip(dx, dy)]
+        s = [0]
+        s.extend(np.cumsum(self.ds))
+        return s
+
+    def calc_position(self, s):
+
+    def calc_position(self, s):
 
 def path_planner_3Dbezier(start_pos, start_dir, goal_pos, goal_dir, interval):
 
