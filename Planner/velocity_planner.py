@@ -44,20 +44,16 @@ def speed_profile(cx, cy, cyaw, target_speed):
     return speed_profile
 
 
-def speed_profile_quinticPoly(vel_start, acc_start, vel_goal, acc_goal, rx, ry):
-    dx = np.diff(rx)
-    dy = np.diff(ry)
-    ds = [math.sqrt(idx ** 2 + idy ** 2)
-          for (idx, idy) in zip(dx, dy)]
-    s = [0]
-    s.extend(np.cumsum(ds))
-    s_sum = s[-1]
+def speed_profile_quinticPoly(vehicle, vel_goal, acc_goal, path):
+    s_sum = path.s[-1]
 
+    vel_start = vehicle.v
+    acc_start = vehicle.acc
     vel_limit = car.Para.speed_max
     acc_limit = car.Para.acceleration_max
-    T = 4 * s_sum/(vel_goal+vel_start)
+    T = 2 * s_sum/(vel_goal+vel_start)
     seg = 10
-    Q = [0.1, 0.005, 5, 10]
+    Q = [0.1, 0.005, 5, 0.1]
     delta_t = T/seg
 
     a = cp.Variable(5)
@@ -75,37 +71,33 @@ def speed_profile_quinticPoly(vel_start, acc_start, vel_goal, acc_goal, rx, ry):
     c_6 = np.matrix(c_6)
     c_7 = np.matrix(c_7)
 
+    N = len(np.arange(delta_t, T, delta_t))
     objective = cp.Minimize(Q[0] * cp.sum_squares(c_0 @ a) + Q[2] * cp.square(cp.sum(a @ c_2)
                             - vel_goal) + Q[3] * cp.square(cp.sum(a @ c_4) - acc_goal))
     constraints = [cp.sum(a @ c_1) == s_sum,
                    cp.sum(a @ c_3) == vel_start,
                    cp.sum(a @ c_5) == acc_start,
-                   c_6 @ a >= np.zeros(seg-1),
-                   c_6 @ a <= np.full(seg-1, vel_limit),
-                   c_7 @ a <= np.full(seg-1, acc_limit),
-                   c_7 @ a >= -np.full(seg-1, acc_limit)]
+                   c_6 @ a >= np.zeros(N),
+                   c_6 @ a <= np.full(N, vel_limit),
+                   c_7 @ a <= np.full(N, acc_limit),
+                   c_7 @ a >= -np.full(N, acc_limit)]
 
     prob = cp.Problem(objective, constraints)
     prob.solve(solver=cp.SCS)
     print(prob.status)
     print(a.value)
 
-    sp = [] * len(rx)
-    sp.append(vel_start)
-
-    return sp
-
-
+    return a.value
 
 
 if __name__ == '__main__':
     vel_limit = 5.0
     vel_goal =  3.0
     vel_start = 0.0
-    acc_limit = 5.0
+    acc_limit = 10.0
     acc_start = 0.0
     acc_goal = 0.0
-    T = 4/(vel_goal+vel_start)
+    T = 3/(vel_goal+vel_start)
     seg = 10
     Q = [0.1, 0.005, 5, 10]
     delta_t = T/seg
@@ -127,14 +119,12 @@ if __name__ == '__main__':
 
     objective = cp.Minimize(Q[2] * cp.square(cp.sum(a @ c_2) - vel_goal) + Q[3] * cp.square(cp.sum(a @ c_4) - acc_goal))
     constraints = [cp.sum(a @ c_1) == 1,
-                   cp.sum(a @ c_3) == vel_start,
+                   a[0] == vel_start,
                    cp.sum(a @ c_5) == acc_start,
                    c_6 @ a >= np.zeros(seg-1),
                    c_6 @ a <= np.full(seg-1, vel_limit),
                    c_7 @ a <= np.full(seg-1, acc_limit),
-                   c_7 @ a >= -np.full(seg-1, acc_limit)
-                   ]
-
+                   c_7 @ a >= -np.full(seg-1, acc_limit)]
 
     prob = cp.Problem(objective, constraints)
     prob.solve(solver=cp.SCS)

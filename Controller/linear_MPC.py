@@ -34,15 +34,15 @@ class MPC:
     du_res = 0.1  # threshold for stopping iteration
 
     # MPC config
-    T = 8  # finite time horizon length
-    Q = np.diag([1.0, 1.0, 1.0, 3.0])  # penalty for states
-    Qf = np.diag([1.0, 1.0, 1.0, 3.0])  # penalty for end state
+    T = 10  # finite time horizon length
+    Q = np.diag([2.0, 2.0, 20.0, 1.0])  # penalty for states
+    Qf = np.diag([1.0, 1.0, 1.0, 1.0])  # penalty for end state
     R = np.diag([0.01, 0.1])  # penalty for inputs
     Rd = np.diag([0.01, 1.0])  # penalty for change of inputs
 
 
 
-def calc_ref_trajectory_in_T_step(car, ref_x, ref_y, ref_yaw, sp):
+def calc_ref_trajectory_in_T_step(car, ref_x, ref_y, ref_yaw, sp_coe):
     """
     calc referent trajectory in T steps: [x, y, v, yaw]
     using the current velocity, calc the T points along the reference path
@@ -56,19 +56,20 @@ def calc_ref_trajectory_in_T_step(car, ref_x, ref_y, ref_yaw, sp):
 
     z_ref[0, 0] = ref_x[0]
     z_ref[1, 0] = ref_y[0]
-    z_ref[2, 0] = sp[0]
+    z_ref[2, 0] = sp_coe[0]
     z_ref[3, 0] = ref_yaw[0]
-
     dist_move = 0.0
 
     for i in range(1, MPC.T + 1):
-        dist_move += abs(car.v) * MPC.dt
-        ind_move = int(round(dist_move / MPC.d_dist))
+        t = i * MPC.dt
+        v = sp_coe[0] + 2*sp_coe[1]*t + 3*sp_coe[2]*t**2 + 4*sp_coe[3]*t**3 + 5*sp_coe[4]*t**4
+        s = sp_coe[0] * t + 2 * sp_coe[1] * t ** 2 + sp_coe[2] * t ** 3 + sp_coe[3] * t ** 4 + sp_coe[4] * t ** 5
+        ind_move = int(round(s / MPC.d_dist))
         index = min(ind_move, length - 1)
 
         z_ref[0, i] = ref_x[index]
         z_ref[1, i] = ref_y[index]
-        z_ref[2, i] = sp[index]
+        z_ref[2, i] = v
         z_ref[3, i] = ref_yaw[index]
 
     return z_ref
@@ -90,16 +91,19 @@ def linear_mpc_control(z_ref, z0, a_old, delta_old):
 
     x, y, yaw, v = None, None, None, None
 
-    for k in range(MPC.iter_max):
-        z_bar = predict_states_in_T_step(z0, a_old, delta_old, z_ref)
-        a_rec, delta_rec = a_old[:], delta_old[:]
-        a_old, delta_old, x, y, yaw, v = solve_linear_mpc(z_ref, z_bar, z0, delta_old)
+    z_bar = predict_states_in_T_step(z0, a_old, delta_old, z_ref)
+    a_old, delta_old, x, y, yaw, v = solve_linear_mpc(z_ref, z_bar, z0, delta_old)
 
-        du_a_max = max([abs(ia - iao) for ia, iao in zip(a_old, a_rec)])
-        du_d_max = max([abs(ide - ido) for ide, ido in zip(delta_old, delta_rec)])
-
-        if max(du_a_max, du_d_max) < MPC.du_res:
-            break
+    # for k in range(MPC.iter_max):
+    #     z_bar = predict_states_in_T_step(z0, a_old, delta_old, z_ref)
+    #     a_rec, delta_rec = a_old[:], delta_old[:]
+    #     a_old, delta_old, x, y, yaw, v = solve_linear_mpc(z_ref, z_bar, z0, delta_old)
+    #
+    #     du_a_max = max([abs(ia - iao) for ia, iao in zip(a_old, a_rec)])
+    #     du_d_max = max([abs(ide - ido) for ide, ido in zip(delta_old, delta_rec)])
+    #
+    #     if max(du_a_max, du_d_max) < MPC.du_res:
+    #         break
 
     return a_old, delta_old, x, y, yaw, v
 
@@ -187,6 +191,7 @@ def solve_linear_mpc(z_ref, z_bar, z0, d_bar):
             cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], MPC.Rd)
             constrains += [cvxpy.abs(u[1, t + 1] - u[1, t]) <= vehicle.Para.steer_change_max * MPC.dt]
 
+    print("ref:", z_ref)
     cost += cvxpy.quad_form(z_ref[:, MPC.T] - z[:, MPC.T], MPC.Qf)
 
     constrains += [z[:, 0] == z0]

@@ -17,19 +17,20 @@ class Para:
 
     steer_max = np.deg2rad(45.0)  # max steering angle [rad]
     steer_change_max = np.deg2rad(30.0)  # maximum steering speed [rad/s]
-    speed_max = 55.0 / 3.6  # maximum speed [m/s]
-    speed_min = -20.0 / 3.6  # minimum speed [m/s]
-    acceleration_max = 1.0  # maximum acceleration [m/s2]
+    speed_max = 30  # maximum speed [m/s]
+    speed_min = -20.0 # minimum speed [m/s]
+    acceleration_max = 20.0  # maximum acceleration [m/s2]
 
 
 
 # todo: add limitation on acc and steer_velocity
 class Vehicle:
-    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0, dt=0.1, direct=1.0):
+    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0, a=0.0, dt=0.1, direct=1.0):
         self.x = x
         self.y = y
         self.yaw = yaw
         self.v = v
+        self.acc = a
         self.direct = direct
         self.dt = dt
 
@@ -62,46 +63,32 @@ class Vehicle:
 
         return v
 
-def get_local_refline(ref_x, ref_y, cur_x, cur_y, cur_yaw, max_dis, ds):
+def get_local_waypoints(ref_x, ref_y, cur_x, cur_y, cur_yaw, max_dis):
     # filter the nearest forward node
     i, i_min = 0, 0
-    min_dis = 15
+    min_dis = 20
     while i < len(ref_x):
         i_dir = [ref_x[i] - cur_x, ref_y[i] - cur_y]
         i_dir_norm = math.sqrt(i_dir[0]**2+i_dir[1]**2)
-        print("i_dir_norm", i_dir_norm)
         # if i_dir_norm != .0 and cur_dir_norm != .0:
         #     theta = np.arccos((i_dir[0] * cur_dir[0] + i_dir[1]*cur_dir[1])/(cur_dir_norm * i_dir_norm))
         if i_dir_norm < min_dis:
             theta = math.atan2(i_dir[1], i_dir[0])
             delta = abs(common.pi_2_pi(theta - cur_yaw))
-            print("delta:", theta, delta)
-            if delta < math.pi / 3:
+            if delta < math.pi / 2:
                 min_dis = i_dir_norm
                 i_min = i
         i += 1
     # filter the maximal forward node in horizon
-    i_max = i_min
+    i_max = i_min + 1
     while i_max < len(ref_x)-1:
         i_max = i_max + 1
         vec_norm = math.sqrt((ref_x[i_max] - cur_x) ** 2 + (ref_y[i_max] - cur_y) ** 2)
         if vec_norm > max_dis:
             break
-    print(i_max, i_min)
     # generate reference line
-    index = range(i_min, i_max, 2)
+    index = range(i_min, i_max, 1)
     x = [ref_x[i] for i in index]
     y = [ref_y[i] for i in index]
 
-    cubicspline = cubic_spline.Spline2D(x, y)
-    s = np.arange(0, cubicspline.s[-1], ds)
-
-    rx, ry, ryaw, rk = [], [], [], []
-    for i_s in s:
-        ix, iy = cubicspline.calc_position(i_s)
-        rx.append(ix)
-        ry.append(iy)
-        ryaw.append(cubicspline.calc_yaw(i_s))
-        rk.append(cubicspline.calc_curvature(i_s))
-
-    return rx, ry, ryaw, rk, cubicspline
+    return x, y

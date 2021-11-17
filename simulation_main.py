@@ -13,7 +13,8 @@ import Simulator.env as env
 import Simulator.draw as draw
 import Simulator.vehicle as vehicle
 import Controller.linear_MPC as mpc
-import Planner.velocity_planner as vel_planner
+import Planner.path_planner as p_planner
+import Planner.velocity_planner as v_planner
 import common
 
 
@@ -29,22 +30,33 @@ def main_Crusing():
     bx1, by1 = ENV.design_boundary_in(road_width)
     bx2, by2 = ENV.design_boundary_out(road_width*2)
     # Initialize vehicle
-    car = vehicle.Vehicle(x=rx_1[0], y=ry_1[0], yaw=-1, v=0.0, dt=mpc.MPC.dt)
+    car = vehicle.Vehicle(x=rx_1[0], y=ry_1[0], yaw=-1, v=0.0, a=0.0, dt=mpc.MPC.dt)
     delta_opt, a_opt = None, None
     a_exc, delta_exc = 0.0, 0.0
 
+    vel_target, acc_goal = 10.0, 0.0
+    fig = plt.figure()
+    im = []
+
     while True:
-        # Generate reference line
+        # Generate reference path
         old_yaw = car.yaw
-        rx, ry, ryaw, rk, ref_path = vehicle.get_local_refline(rx_1, ry_1, car.x, car.y, car.yaw, 40, mpc.MPC.d_dist)
+        wp_x, wp_y = vehicle.get_local_waypoints(rx_1, ry_1, car.x, car.y, car.yaw, 20)
+        if wp_x[0] != car.x:
+            wp_x.insert(0, car.x)
+            wp_y.insert(0, car.y)
+        rx, ry, ryaw, rk, cubicspline = p_planner.following_path(wp_x, wp_y, mpc.MPC.d_dist)
+
         # Generate speed profile
-        rx.insert(0, car.x)
-        ry.insert(0, car.y)
-        sp = vel_planner.speed_profile(rx, ry, ryaw, target_speed=5.0)
-        z_ref = mpc.calc_ref_trajectory_in_T_step(car, rx, ry, ryaw, sp)
+        poly_coe = v_planner.speed_profile_quinticPoly(car, vel_target, acc_goal, cubicspline)
+
+        # Generate reference state for MPC
+        z_ref = mpc.calc_ref_trajectory_in_T_step(car, rx, ry, ryaw, poly_coe)
+
         # MPC controller
         z0 = [car.x, car.y, car.v, car.yaw]
         a_opt, delta_opt, x_opt, y_opt, yaw_opt, v_opt = mpc.linear_mpc_control(z_ref, z0, a_opt, delta_opt)
+
         # Update simulation
         if delta_opt is not None:
             delta_exc, a_exc = delta_opt[0], a_opt[0]
@@ -54,6 +66,7 @@ def main_Crusing():
         dy = (car.yaw - old_yaw) / (car.v * mpc.MPC.dt)
         steer = common.pi_2_pi(-math.atan(vehicle.Para.WB * dy))
         # Update Visualization
+
         plt.cla()
         # for stopping simulation with the esc key.
         plt.gcf().canvas.mpl_connect(
@@ -64,6 +77,7 @@ def main_Crusing():
         plt.plot(rx, ry, linestyle='--', color='r')
         plt.plot(bx1, by1, linewidth=1.5, color='k')
         plt.plot(bx2, by2, linewidth=1.5, color='k')
+        plt.plot(wp_x, wp_y, 'oy')
         # plt.plot(path.x[1:], path.y[1:], linewidth='2', color='royalblue')
         # plt.plot(obs_x, obs_y, 'ok')
         draw.draw_car(car.x, car.y, car.yaw, steer, C=vehicle.Para)
