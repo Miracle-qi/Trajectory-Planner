@@ -44,17 +44,15 @@ def speed_profile(cx, cy, cyaw, target_speed):
     return speed_profile
 
 
-def speed_profile_quinticPoly(vehicle, vel_goal, acc_goal, path):
+def speed_profile_quinticPoly(vehicle, vel_goal, acc_goal, s_sum):
     """
     generate smooth speed profile with quintic polynomial
     :param vehicle: current status of the vehicle [x,y,v,yaw]
     :param vel_goal: expected velocity at the end point
     :param acc_goal: expected acceleration at the end point
-    :param path: path function
+    :param s_sum: total journey
     :return: coefficients of  quintic polynomial
     """
-
-    s_sum = path.s[-1]
 
     vel_start = vehicle.v
     acc_start = vehicle.acc

@@ -181,9 +181,6 @@ class Spline2D:
         yaw = math.atan2(dy, dx)
         return yaw
 
-
-
-
 def test_spline2d():
     print("Spline 2D test")
     import matplotlib.pyplot as plt

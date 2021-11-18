@@ -27,28 +27,26 @@ def main_Crusing():
     rx_1.extend(rx_1[0:10])
     ry_1.extend(ry_1[0:10])
     rx_2, ry_2 = ENV.design_reference_line(road_width)
+    rx_2.extend(rx_2[0:10])
+    ry_2.extend(ry_2[0:10])
     bx1, by1 = ENV.design_boundary_in(road_width)
     bx2, by2 = ENV.design_boundary_out(road_width*2)
+
     # Initialize vehicle
-    car = vehicle.Vehicle(x=rx_1[0], y=ry_1[0], yaw=-1, v=0.0, a=0.0, dt=mpc.MPC.dt)
+    car = vehicle.Vehicle(x=rx_1[0], y=ry_1[0], yaw=-1, v=0.0, a=0.0, dt=mpc.MPC.dt,
+                          status="following", lane=1)
     delta_opt, a_opt = None, None
     a_exc, delta_exc = 0.0, 0.0
-
     vel_target, acc_goal = 10.0, 0.0
-    fig = plt.figure()
-    im = []
+
 
     while True:
         # Generate reference path
         old_yaw = car.yaw
-        wp_x, wp_y = vehicle.get_local_waypoints(rx_1, ry_1, car.x, car.y, car.yaw, 20)
-        if wp_x[0] != car.x:
-            wp_x.insert(0, car.x)
-            wp_y.insert(0, car.y)
-        rx, ry, ryaw, rk, cubicspline = p_planner.following_path(wp_x, wp_y, mpc.MPC.d_dist)
+        rx, ry, ryaw, s_sum = p_planner.Path_Planner(car, rx_1, ry_1, rx_2, ry_2)
 
         # Generate speed profile
-        poly_coe = v_planner.speed_profile_quinticPoly(car, vel_target, acc_goal, cubicspline)
+        poly_coe = v_planner.speed_profile_quinticPoly(car, vel_target, acc_goal, s_sum)
 
         # Generate reference state for MPC
         z_ref = mpc.calc_ref_trajectory_in_T_step(car, rx, ry, ryaw, poly_coe)
@@ -77,7 +75,6 @@ def main_Crusing():
         plt.plot(rx, ry, linestyle='--', color='r')
         plt.plot(bx1, by1, linewidth=1.5, color='k')
         plt.plot(bx2, by2, linewidth=1.5, color='k')
-        plt.plot(wp_x, wp_y, 'oy')
         # plt.plot(path.x[1:], path.y[1:], linewidth='2', color='royalblue')
         # plt.plot(obs_x, obs_y, 'ok')
         draw.draw_car(car.x, car.y, car.yaw, steer, C=vehicle.Para)

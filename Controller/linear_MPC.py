@@ -8,14 +8,12 @@ import sys
 import math
 import cvxpy
 import numpy as np
+import bisect
 import matplotlib.pyplot as plt
 
 # sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
 #                 "/../../MotionPlanning/")
 
-
-import CurvesGenerator.reeds_shepp as rs
-import CurvesGenerator.cubic_spline as cs
 import Simulator.vehicle as vehicle
 
 class MPC:
@@ -35,11 +33,19 @@ class MPC:
 
     # MPC config
     T = 10  # finite time horizon length
-    Q = np.diag([2.0, 2.0, 20.0, 1.0])  # penalty for states
+    Q = np.diag([5.0, 5.0, 100.0, 1.0])  # penalty for states
     Qf = np.diag([1.0, 1.0, 1.0, 1.0])  # penalty for end state
     R = np.diag([0.01, 0.1])  # penalty for inputs
     Rd = np.diag([0.01, 1.0])  # penalty for change of inputs
 
+
+def calc_index(rx, ry, s_t):
+    dx = np.diff(rx)
+    dy = np.diff(ry)
+    ds = [math.sqrt(idx ** 2 + idy ** 2) for (idx, idy) in zip(dx, dy)]
+    s = [0]
+    s.extend(np.cumsum(ds))
+    return bisect.bisect(s, s_t) - 1
 
 
 def calc_ref_trajectory_in_T_step(car, ref_x, ref_y, ref_yaw, sp_coe):
@@ -64,8 +70,7 @@ def calc_ref_trajectory_in_T_step(car, ref_x, ref_y, ref_yaw, sp_coe):
         t = i * MPC.dt
         v = sp_coe[0] + 2*sp_coe[1]*t + 3*sp_coe[2]*t**2 + 4*sp_coe[3]*t**3 + 5*sp_coe[4]*t**4
         s = sp_coe[0] * t + 2 * sp_coe[1] * t ** 2 + sp_coe[2] * t ** 3 + sp_coe[3] * t ** 4 + sp_coe[4] * t ** 5
-        ind_move = int(round(s / MPC.d_dist))
-        index = min(ind_move, length - 1)
+        index = calc_index(ref_x, ref_y, s)
 
         z_ref[0, i] = ref_x[index]
         z_ref[1, i] = ref_y[index]
@@ -191,7 +196,7 @@ def solve_linear_mpc(z_ref, z_bar, z0, d_bar):
             cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], MPC.Rd)
             constrains += [cvxpy.abs(u[1, t + 1] - u[1, t]) <= vehicle.Para.steer_change_max * MPC.dt]
 
-    print("ref:", z_ref)
+    # print("ref:", z_ref)
     cost += cvxpy.quad_form(z_ref[:, MPC.T] - z[:, MPC.T], MPC.Qf)
 
     constrains += [z[:, 0] == z0]

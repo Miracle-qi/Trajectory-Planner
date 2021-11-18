@@ -25,7 +25,7 @@ class Para:
 
 # todo: add limitation on acc and steer_velocity
 class Vehicle:
-    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0, a=0.0, dt=0.1, direct=1.0):
+    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0, a=0.0, dt=0.1, direct=1.0, status="following", lane=1):
         self.x = x
         self.y = y
         self.yaw = yaw
@@ -33,6 +33,8 @@ class Vehicle:
         self.acc = a
         self.direct = direct
         self.dt = dt
+        self.status = status
+        self.laneIndex = lane
 
     def update(self, a, delta, direct):
         delta = self.limit_input_delta(delta)
@@ -63,32 +65,19 @@ class Vehicle:
 
         return v
 
-def get_local_waypoints(ref_x, ref_y, cur_x, cur_y, cur_yaw, max_dis):
-    # filter the nearest forward node
-    i, i_min = 0, 0
+def get_nearest_waypoints(ref_x, ref_y, cur_x, cur_y, cur_yaw):
+    # Find the nearest forward node
+    i, i_nearest = 0, 0
     min_dis = 20
     while i < len(ref_x):
         i_dir = [ref_x[i] - cur_x, ref_y[i] - cur_y]
         i_dir_norm = math.sqrt(i_dir[0]**2+i_dir[1]**2)
-        # if i_dir_norm != .0 and cur_dir_norm != .0:
-        #     theta = np.arccos((i_dir[0] * cur_dir[0] + i_dir[1]*cur_dir[1])/(cur_dir_norm * i_dir_norm))
+
         if i_dir_norm < min_dis:
             theta = math.atan2(i_dir[1], i_dir[0])
             delta = abs(common.pi_2_pi(theta - cur_yaw))
             if delta < math.pi / 2:
                 min_dis = i_dir_norm
-                i_min = i
+                i_nearest = i
         i += 1
-    # filter the maximal forward node in horizon
-    i_max = i_min + 1
-    while i_max < len(ref_x)-1:
-        i_max = i_max + 1
-        vec_norm = math.sqrt((ref_x[i_max] - cur_x) ** 2 + (ref_y[i_max] - cur_y) ** 2)
-        if vec_norm > max_dis:
-            break
-    # generate reference line
-    index = range(i_min, i_max, 1)
-    x = [ref_x[i] for i in index]
-    y = [ref_y[i] for i in index]
-
-    return x, y
+    return i_nearest

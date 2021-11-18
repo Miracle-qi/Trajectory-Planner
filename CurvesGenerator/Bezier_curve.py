@@ -1,96 +1,118 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.special
 from common import Traj_Point
 
-class bezierCurve:
 
-    def __init__(self, start_pos, start_dir, goal_pos, goal_dir, interval):
 
-    def __calc_s(self, x, y):
-        dx = np.diff(x)
-        dy = np.diff(y)
-        self.ds = [math.sqrt(idx ** 2 + idy ** 2)
-                   for (idx, idy) in zip(dx, dy)]
-        s = [0]
-        s.extend(np.cumsum(self.ds))
-        return s
+def calc_path(sx, sy, syaw, ex, ey, eyaw, offset, d_dist):
+    """
+    Compute control points and path given start and end position.
+    :param sx: (float) x-coordinate of the starting point
+    :param sy: (float) y-coordinate of the starting point
+    :param syaw: (float) yaw angle at start
+    :param ex: (float) x-coordinate of the ending point
+    :param ey: (float) y-coordinate of the ending point
+    :param eyaw: (float) yaw angle at the end
+    :param offset: (float)
+    :return: (numpy array, numpy array)
+    """
+    length = np.hypot(sx - ex, sy - ey)
+    dist = length / offset
+    n_points = int(length / d_dist)
+    control_points = np.array(
+        [[sx, sy],
+         [sx + dist * np.cos(syaw), sy + dist * np.sin(syaw)],
+         [ex - dist * np.cos(eyaw), ey - dist * np.sin(eyaw)],
+         [ex, ey]])
 
-    def calc_position(self, s):
+    rx, ry, ryaw = [], [], []
+    for t in np.linspace(0, 1, n_points):
+        p = bezier(t, control_points)
+        rx.append(p[0])
+        ry.append(p[1])
+        ryaw.append(calc_yaw(t, control_points))
+    s = calc_s(rx, ry)
 
-    def calc_position(self, s):
+    return rx, ry, ryaw, s
 
-def path_planner_3Dbezier(start_pos, start_dir, goal_pos, goal_dir, interval):
 
-    control_point_shift = 1.0 / 3
-    length = math.sqrt((goal_pos[0] - start_pos[0]) ** 2 + (goal_pos[1] - start_pos[1]) ** 2)
-    norm_goal_dir = math.sqrt(goal_dir[0]**2 + goal_dir[1]**2)
-    goal_dir[0] = goal_dir[0] / norm_goal_dir
-    goal_dir[1] = goal_dir[1] / norm_goal_dir
-    norm_start_dir = math.sqrt(start_dir[0]**2 + start_dir[1]**2)
-    start_dir[0] = start_dir[0] / (norm_start_dir+1e-5)
-    start_dir[1] = start_dir[1] / (norm_start_dir+1e-5)
-    P1 = [0, 0]
-    P2 = [0, 0]
-    P1[0] = start_pos[0] + length * control_point_shift * start_dir[0]
-    P1[1] = start_pos[1] + length * control_point_shift * start_dir[1]
-    P2[0] = goal_pos[0] - length * control_point_shift * goal_dir[0]
-    P2[1] = goal_pos[1] - length * control_point_shift * goal_dir[1]
-    P0 = start_pos
-    P3 = goal_pos
-    appro_length = math.sqrt((start_pos[0] - P1[0]) ** 2 + (start_pos[1] - P1[1]) ** 2) + math.sqrt((goal_pos[0] - P2[0]) ** 2 + \
-                             (goal_pos[1] - P2[1]) ** 2) + math.sqrt((P1[0] - P2[0]) ** 2 + (P1[1] - P2[1]) ** 2) + \
-                   math.sqrt((start_pos[0] - goal_pos[0]) ** 2 + (start_pos[1] - goal_pos[1]) **2)
-    appro_length = appro_length * 0.5
-    dt = interval / (appro_length + 0.01)
-    if (dt < 1e-3):
-        dt = 1e-3
-    t = 0
-    traj_points=[]
-    while t < 1:
-        point = Traj_Point()
-        point.x = P0[0] * (1 - 3 * t + 3 * t * t - t * t * t) + P1[0] * (3 * t - 6 * t * t + 3 * t * t * t) + P2[0] * (3 * t * t - 3 * t * t * t) + P3[0] * (t * t * t)
-        point.y = P0[1] * (1 - 3 * t + 3 * t * t - t * t * t) + P1[1] * (3 * t - 6 * t * t + 3 * t * t * t) + P2[1] * (3 * t * t - 3 * t * t * t) + P3[1] * (t * t * t)
-        point.x_dot = P0[0] * (-3 + 6 * t - 3 * t * t) + P1[0] * (3 - 12 * t + 9 * t * t) + P2[0] * (6 * t - 9 * t * t) + P3[0] * (3 * t * t)
-        point.y_dot = P0[1] * (-3 + 6 * t - 3 * t * t) + P1[1] * (3 - 12 * t + 9 * t * t) + P2[1] * (6 * t - 9 * t * t) + P3[1] * (3 * t * t)
-        x_ddot = P0[0] * (6 - 6 * t) + P1[0] * (-12 + 18 * t) + P2[0] * (6 - 18 * t) + P3[0] * (6 * t)
-        y_ddot = P0[1] * (6 - 6 * t) + P1[1] * (-12 + 18 * t) + P2[1] * (6 - 18 * t) + P3[1] * (6 * t)
-        point.theta = 0
-        if (point.x_dot == 0):
-            if (point.y_dot > 0):
-                point.theta = math.pi / 2
-            elif (point.y_dot < 0):
-                point.theta = -math.pi / 2
-            else:
-                point.theta = 0
-        else:
-            point.theta = math.atan2(point.y_dot, point.x_dot)
-        point.curvature = (point.x_dot * y_ddot - x_ddot * point.y_dot) / ((point.x_dot * point.x_dot + point.y_dot * point.y_dot) ** (3.0 / 2.0))
-        norm_dir = math.sqrt(point.x_dot ** 2 + point.y_dot ** 2)
-        point.x_dot = point.x_dot / norm_dir
-        point.y_dot = point.y_dot / norm_dir
-        traj_points.append(point)
-        t = t + dt
-    return traj_points
+def bernstein_poly(n, i, t):
+    """
+    Bernstein polynom.
+    :param n: (int) polynom degree
+    :param i: (int)
+    :param t: (float)
+    :return: (float)
+    """
+    return scipy.special.comb(n, i) * t ** i * (1 - t) ** (n - i)
 
+
+def bezier(t, control_points):
+    """
+    Return one point on the bezier curve.
+    :param t: (float) number in [0, 1]
+    :param control_points: (numpy array)
+    :return: (numpy array) Coordinates of the point
+    """
+    n = len(control_points) - 1
+    return np.sum([bernstein_poly(n, i, t) * control_points[i] for i in range(n + 1)], axis=0)
+
+
+def bezier_derivatives_control_points(control_points, n_derivatives):
+    """
+    Compute control points of the successive derivatives of a given bezier curve.
+    A derivative of a bezier curve is a bezier curve.
+    See https://pomax.github.io/bezierinfo/#derivatives
+    for detailed explanations
+    :param control_points: (numpy array)
+    :param n_derivatives: (int)
+    e.g., n_derivatives=2 -> compute control points for first and second derivatives
+    :return: ([numpy array])
+    """
+    w = {0: control_points}
+    for i in range(n_derivatives):
+        n = len(w[i])
+        w[i + 1] = np.array([(n - 1) * (w[i][j + 1] - w[i][j])
+                             for j in range(n - 1)])
+    return w
+
+
+def calc_curvature(dx, dy, ddx, ddy):
+    """
+    Compute curvature at one point given first and second derivatives.
+    :param dx: (float) First derivative along x axis
+    :param dy: (float)
+    :param ddx: (float) Second derivative along x axis
+    :param ddy: (float)
+    :return: (float)
+    """
+    return (dx * ddy - dy * ddx) / (dx ** 2 + dy ** 2) ** (3 / 2)
+
+def calc_yaw(t, control_points):
+    u"""
+    calc yaw
+    """
+    derivatives_cp = bezier_derivatives_control_points(control_points, 1)
+    dt = bezier(t, derivatives_cp[1])
+    yaw = math.atan2(dt[1], dt[0])
+    return yaw
+
+def calc_s(rx, ry):
+    dx = np.diff(rx)
+    dy = np.diff(ry)
+    ds = [math.sqrt(idx ** 2 + idy ** 2) for (idx, idy) in zip(dx, dy)]
+    s = [0]
+    s.extend(np.cumsum(ds))
+    return s
 
 if __name__ == '__main__':
-    traj_test = path_planner_3Dbezier([0, 0], [1, 0], [60, 20], [1, 0],  0.2)
-    traj_x, traj_y = [], []
-    traj_x_dot, traj_y_dot = [], []
-    traj_curv = []
-    for p in traj_test:
-        traj_x.append(p.x)
-        traj_y.append(p.y)
-        traj_x_dot.append(p.x_dot)
-        traj_y_dot.append(p.y_dot)
-        traj_curv.append(p.curvature)
+
+    rx, ry, ryaw = calc_path(0, 0, math.pi/2, 20, 80, math.pi/2, 3, 100)
+
     plt.figure()
-    plt.plot(traj_x, traj_y, "r")
+    plt.plot(rx, ry, "r")
     plt.figure()
-    plt.plot(traj_x_dot, "g")
-    plt.figure()
-    plt.plot(traj_y_dot, "o")
-    plt.figure()
-    plt.plot(traj_curv, "b")
+    plt.plot(ryaw, "g")
     plt.show()

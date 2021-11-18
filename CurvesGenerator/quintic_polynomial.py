@@ -6,7 +6,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-from CurvesGenerator import draw
+from Simulator import draw
 
 
 class QuinticPolynomial:
@@ -179,9 +179,9 @@ def simulation():
                                      lambda event: [exit(0) if event.key == 'escape' else None])
         plt.axis("equal")
         plt.plot(path.x, path.y, linewidth=2, color='gray')
-        draw.Car(sx, sy, syaw, 1.5, 3)
-        draw.Car(gx, gy, gyaw, 1.5, 3)
-        draw.Car(path.x[i], path.y[i], path.yaw[i], 1.5, 3)
+        draw.draw_car(sx, sy, syaw, 1.5, 3.0)
+        draw.draw_car(gx, gy, gyaw, 1.5, 3.0)
+        draw.draw_car(path.x[i], path.y[i], path.yaw[i], 1.5, 3)
         plt.title("Quintic Polynomial Curves")
         plt.pause(0.001)
     plt.show()
