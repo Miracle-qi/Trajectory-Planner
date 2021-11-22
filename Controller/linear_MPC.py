@@ -33,7 +33,7 @@ class MPC:
 
     # MPC config
     T = 10  # finite time horizon length
-    Q = np.diag([5.0, 5.0, 100.0, 1.0])  # penalty for states
+    Q = np.diag([1.0, 1.0, 100.0, 1.0])  # penalty for states
     Qf = np.diag([1.0, 1.0, 1.0, 1.0])  # penalty for end state
     R = np.diag([0.01, 0.1])  # penalty for inputs
     Rd = np.diag([0.01, 1.0])  # penalty for change of inputs
